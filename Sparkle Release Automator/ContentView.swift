@@ -128,19 +128,25 @@ class ReleaseBuilderViewModel: ObservableObject {
         dateParams.locale = Locale(identifier: "en_US_POSIX")
         let dateString = dateParams.string(from: Date())
         
-        // Matching your exact requested structure
+        // Full RSS Structure
         return """
-        <item>
-            <title>\(info.shortVersion)</title>
-            <pubDate>\(dateString)</pubDate>
-            <sparkle:version>\(info.version)</sparkle:version>
-            <sparkle:shortVersionString>\(info.shortVersion)</sparkle:shortVersionString>
-            <enclosure 
-                url="\(url)" 
-                sparkle:edSignature="\(signatureData.signature)" 
-                length="\(signatureData.length)" 
-                type="application/octet-stream" />
-        </item>
+        <?xml version="1.0" standalone="yes"?>
+        <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+            <channel>
+                <title>\(info.name) Updates</title>
+                <item>
+                    <title>\(info.shortVersion)</title>
+                    <pubDate>\(dateString)</pubDate>
+                    <sparkle:version>\(info.version)</sparkle:version>
+                    <sparkle:shortVersionString>\(info.shortVersion)</sparkle:shortVersionString>
+                    <enclosure 
+                        url="\(url)" 
+                        sparkle:edSignature="\(signatureData.signature)" 
+                        length="\(signatureData.length)" 
+                        type="application/octet-stream" />
+                </item>
+            </channel>
+        </rss>
         """
     }
 
