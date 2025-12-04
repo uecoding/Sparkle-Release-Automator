@@ -1,0 +1,13 @@
+
+.DS_Store
+.vscode
+
+# --- Sparkle Updates ---
+
+# SECURITY CRITICAL: Never commit the private key
+dsa_priv.pem
+*.pem
+
+SparkleTools/
+bin/
+Sparkle 2.8.1/
