@@ -5,21 +5,17 @@ import UniformTypeIdentifiers
 // MARK: - ViewModel
 class ReleaseBuilderViewModel: ObservableObject {
     
-    // MARK: - Persistent Settings
-    @Published var sparkleToolsPath: String {
-        didSet { UserDefaults.standard.set(sparkleToolsPath, forKey: "sparkleToolsPath") }
-    }
-    
-    @Published var privateKeyPath: String {
-        didSet { UserDefaults.standard.set(privateKeyPath, forKey: "privateKeyPath") }
-    }
-    
     // MARK: - State
-    @Published var statusMessage: String = "Ready. Drop your .app file here."
+    @Published var statusMessage: String = "Checking Keychain..."
     @Published var generatedXML: String = ""
     @Published var isProcessing: Bool = false
     @Published var isAppLoaded: Bool = false
     @Published var isGenerated: Bool = false
+    
+    // Key Management
+    @Published var isKeyInKeychain: Bool = false
+    @Published var showPublicKeySheet: Bool = false
+    @Published var currentPublicKey: String = ""
     
     // Inputs
     @Published var downloadUrl: String = ""
@@ -36,8 +32,48 @@ class ReleaseBuilderViewModel: ObservableObject {
     private var currentSignature: SignatureResult?
     
     init() {
-        self.sparkleToolsPath = UserDefaults.standard.string(forKey: "sparkleToolsPath") ?? ""
-        self.privateKeyPath = UserDefaults.standard.string(forKey: "privateKeyPath") ?? ""
+        checkKeychainStatus()
+    }
+    
+    // MARK: - Key Management Logic
+    
+    func checkKeychainStatus() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                guard let keyToolUrl = Bundle.main.url(forResource: "generate_keys", withExtension: nil) else { return }
+                
+                // Running 'generate_keys -p' prints ONLY the raw key string if found.
+                // If no key exists, the tool exits with a non-zero code, which runCommand catches.
+                let output = try self.runCommand(executable: keyToolUrl, arguments: ["-p"])
+                let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                DispatchQueue.main.async {
+                    if !trimmed.isEmpty {
+                        self.isKeyInKeychain = true
+                        self.currentPublicKey = trimmed
+                        self.statusMessage = "Ready. Key found in Keychain."
+                    } else {
+                        // This technically shouldn't happen if exit code was 0, but good to handle
+                        self.isKeyInKeychain = false
+                        self.statusMessage = "Keychain returned empty key data."
+                    }
+                }
+            } catch {
+                // If generates_keys fails (exit code != 0), it means no key was found in Keychain
+                DispatchQueue.main.async {
+                    self.isKeyInKeychain = false
+                    self.statusMessage = "Ready (No Key Detected)."
+                }
+            }
+        }
+    }
+    
+    func showPublicKey() {
+        if !currentPublicKey.isEmpty {
+            showPublicKeySheet = true
+        } else {
+            checkKeychainStatus()
+        }
     }
     
     // MARK: - Step 1: Analyze Dropped File
@@ -47,14 +83,11 @@ class ReleaseBuilderViewModel: ObservableObject {
             return
         }
         
-        // Reset State
         self.resetState()
         self.droppedAppUrl = url
         
         do {
             let info = try getAppInfo(appUrl: url)
-            
-            // UI Updates
             DispatchQueue.main.async {
                 self.appName = info.name
                 self.appVersion = info.version
@@ -70,10 +103,10 @@ class ReleaseBuilderViewModel: ObservableObject {
     
     // MARK: - Step 2: Generate (Zip & Sign)
     func generateRelease() {
-        guard let url = droppedAppUrl,
-              !sparkleToolsPath.isEmpty,
-              !privateKeyPath.isEmpty else {
-            statusMessage = "Error: Missing file or configuration."
+        guard let url = droppedAppUrl else { return }
+        
+        if !isKeyInKeychain {
+            statusMessage = "Error: No Key in Keychain. Run 'generate_keys' in Terminal first."
             return
         }
         
@@ -87,17 +120,15 @@ class ReleaseBuilderViewModel: ObservableObject {
     
     private func runBackgroundTasks(appUrl: URL) {
         do {
-            // 1. Zip (Naming: AppName-vVersion.zip)
+            // 1. Zip
             let zipUrl = try createZip(from: appUrl, name: self.appName, version: self.appShortVersion)
             
-            // 2. Sign
+            // 2. Sign (Automatic Keychain Lookup)
             let signatureData = try signUpdate(zipUrl: zipUrl)
             
             DispatchQueue.main.async {
                 self.zipLocation = zipUrl
                 self.currentSignature = signatureData
-                
-                // Generate initial XML with placeholder
                 self.regenerateXML(forceUrl: nil)
                 
                 self.statusMessage = "Success! Zip created and signed."
@@ -122,7 +153,6 @@ class ReleaseBuilderViewModel: ObservableObject {
     private func regenerateXML(forceUrl: String?) {
         guard let sig = currentSignature else { return }
         
-        // Use provided URL, or default placeholder
         let finalURL = forceUrl ?? "INSERT_URL_HERE"
         
         let dateParams = DateFormatter()
@@ -197,18 +227,17 @@ class ReleaseBuilderViewModel: ObservableObject {
     
     private func createZip(from appUrl: URL, name: String, version: String) throws -> URL {
         let folder = appUrl.deletingLastPathComponent()
-        // Format: AppName-v0.2.1.zip
         let zipName = "\(name)-v\(version).zip"
         let destination = folder.appendingPathComponent(zipName)
         
-        // Remove existing if any
         try? FileManager.default.removeItem(at: destination)
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         process.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", appUrl.path, destination.path]
         
-        try runProcess(process)
+        _ = try runCommand(executable: URL(fileURLWithPath: "/usr/bin/ditto"), arguments: process.arguments!)
+        
         return destination
     }
     
@@ -218,26 +247,12 @@ class ReleaseBuilderViewModel: ObservableObject {
     }
     
     private func signUpdate(zipUrl: URL) throws -> SignatureResult {
-        let signTool = URL(fileURLWithPath: sparkleToolsPath).appendingPathComponent("sign_update")
-        
-        guard FileManager.default.fileExists(atPath: signTool.path) else {
-            throw NSError(domain: "App", code: 2, userInfo: [NSLocalizedDescriptionKey: "sign_update tool not found."])
+        guard let signToolUrl = Bundle.main.url(forResource: "sign_update", withExtension: nil) else {
+             throw NSError(domain: "App", code: 2, userInfo: [NSLocalizedDescriptionKey: "sign_update tool not found."])
         }
         
-        let process = Process()
-        process.executableURL = signTool
-        process.arguments = ["--ed-key-file", privateKeyPath, zipUrl.path]
-        
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        
-        try runProcess(process)
-        
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "App", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not read signature output."])
-        }
-        
+        // NO ARGUMENTS (besides the zip path) = Use Keychain
+        let output = try runCommand(executable: signToolUrl, arguments: [zipUrl.path])
         return parseSignatureOutput(output)
     }
     
@@ -258,17 +273,35 @@ class ReleaseBuilderViewModel: ObservableObject {
         return SignatureResult(signature: sig, length: len)
     }
     
-    private func runProcess(_ process: Process) throws {
-        let errorPipe = Pipe()
-        process.standardError = errorPipe
+    // MARK: - Robust Command Runner
+    private func runCommand(executable: URL, arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+        
         try process.run()
+        
+        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        
         process.waitUntilExit()
         
+        let outString = String(data: outData, encoding: .utf8) ?? ""
+        let errString = String(data: errData, encoding: .utf8) ?? ""
+        
+        // Sparkle tools exit with non-zero if they fail (e.g. key not found)
         if process.terminationStatus != 0 {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorMsg = String(data: errorData, encoding: .utf8) ?? "Unknown shell error"
-            throw NSError(domain: "Shell", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw NSError(domain: "Shell", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: "Command failed: \(errString)"])
         }
+        
+        return outString + (outString.isEmpty ? errString : "")
     }
 }
 
@@ -298,6 +331,9 @@ struct ContentView: View {
             .padding()
         }
         .frame(minWidth: 900, minHeight: 700)
+        .sheet(isPresented: $vm.showPublicKeySheet) {
+            PublicKeySheet(publicKey: vm.currentPublicKey)
+        }
     }
     
     // MARK: - Subviews
@@ -308,24 +344,46 @@ struct ContentView: View {
                 .font(.headline)
                 .padding(.bottom, 5)
             
-            Group {
-                Text("SparkleTools Folder").font(.caption).bold()
+            // Key Status Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Private Key Status")
+                    .font(.caption).bold()
+                
                 HStack {
-                    TextField("Path", text: $vm.sparkleToolsPath)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    Button("...") { selectFolder { vm.sparkleToolsPath = $0 } }
+                    Image(systemName: vm.isKeyInKeychain ? "lock.shield.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(vm.isKeyInKeychain ? .green : .orange)
+                    Text(vm.isKeyInKeychain ? "Found in Keychain" : "Missing from Keychain")
+                        .font(.system(size: 13, weight: .medium))
+                    Spacer()
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
+                
+                if vm.isKeyInKeychain {
+                    Button(action: { vm.showPublicKey() }) {
+                        Label("Show Public Key", systemImage: "eye")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.small)
+                } else {
+                    Text("No key found. Run `generate_keys` in Terminal to create one.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
-                Text("Private Key File (.pem)").font(.caption).bold()
-                HStack {
-                    TextField("Path", text: $vm.privateKeyPath)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    Button("...") { selectFile { vm.privateKeyPath = $0 } }
+                // Refresh Button
+                Button(action: { vm.checkKeychainStatus() }) {
+                    Label("Refresh Status", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
                 }
+                .controlSize(.small)
+                .padding(.top, 5)
             }
+            
             Spacer()
             
-            // App Info Small Summary (if loaded)
+            // App Info Small Summary
             if vm.isAppLoaded {
                 Divider()
                 Text("App Details")
@@ -362,7 +420,6 @@ struct ContentView: View {
                     Text(vm.statusMessage).font(.headline)
                 }
             } else if vm.isAppLoaded {
-                // App Loaded State
                 VStack(spacing: 15) {
                     if let icon = vm.appIcon {
                         Image(nsImage: icon)
@@ -372,17 +429,22 @@ struct ContentView: View {
                     Text(vm.appName).font(.title2).bold()
                     Text("Version: \(vm.appShortVersion) (\(vm.appVersion))").font(.body).foregroundColor(.secondary)
                     
-                    Button(action: { vm.generateRelease() }) {
-                        Label("Generate Release", systemImage: "sparkles")
-                            .font(.headline)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                    if vm.isKeyInKeychain {
+                        Button(action: { vm.generateRelease() }) {
+                            Label("Generate Release", systemImage: "sparkles")
+                                .font(.headline)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 5)
+                    } else {
+                        Text("Missing Private Key in Keychain.")
+                            .foregroundColor(.red)
+                            .font(.caption)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.top, 5)
                 }
             } else {
-                // Empty State
                 VStack(spacing: 15) {
                     Image(systemName: "arrow.down.doc")
                         .font(.system(size: 40))
@@ -440,7 +502,7 @@ struct ContentView: View {
                 Button(action: { vm.applyUrlToXML() }) {
                     HStack {
                         Image(systemName: "arrow.triangle.2.circlepath").font(.headline)
-                        Text("Update XML").font(.headline).fontWeight(.semibold)
+                        Text("Update URL").font(.headline).fontWeight(.semibold)
                     }
                     .padding(.vertical, 8)
                 }
@@ -506,25 +568,59 @@ struct ContentView: View {
         }
         .padding(.top, 5)
     }
+}
+
+// MARK: - Public Key Sheet
+struct PublicKeySheet: View {
+    let publicKey: String
+    @Environment(\.presentationMode) var presentationMode
     
-    // MARK: - Helpers
-    func selectFolder(completion: @escaping (String) -> Void) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            completion(url.path)
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "key.viewfinder")
+                .font(.system(size: 40))
+                .foregroundColor(.blue)
+            
+            Text("Public Key String")
+                .font(.title2)
+                .bold()
+            
+            Text("This is the raw public key from your Keychain.")
+                .multilineTextAlignment(.center)
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("In Info.plist, it should look like this:")
+                    .font(.caption)
+                    .bold()
+                Text("<key>SUPublicEDKey</key>")
+                    .font(.caption).fontDesign(.monospaced)
+                Text("<string>\(publicKey.prefix(10))...</string>")
+                    .font(.caption).fontDesign(.monospaced)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color.black.opacity(0.1))
+            .cornerRadius(8)
+            
+            TextEditor(text: .constant(publicKey))
+                .font(.system(.body, design: .monospaced))
+                .frame(height: 80)
+                .padding(4)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+            
+            HStack {
+                Button("Copy Key") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(publicKey, forType: .string)
+                }
+                
+                Button("Done") {
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
-    }
-    
-    func selectFile(completion: @escaping (String) -> Void) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            completion(url.path)
-        }
+        .padding(30)
+        .frame(width: 500)
     }
 }
