@@ -428,11 +428,20 @@ struct ContentView: View {
                             .foregroundColor(.secondary.opacity(0.7))
                             .padding(.top, 2)
                         
-                        Button("Sparkle & 3rd Party Licenses") {
-                            showLicenseSheet = true
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let url = URL(string: "mailto:uecoding@gmail.com") {
+                                Link("Contact Developer", destination: url)
+                                    .buttonStyle(.link)
+                                    .font(.caption2)
+                            }
+                            
+                            Button("Sparkle & 3rd Party Licenses") {
+                                showLicenseSheet = true
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption2)
                         }
-                        .buttonStyle(.link)
-                        .font(.caption2)
                         .padding(.top, 1)
                     }
                 }
