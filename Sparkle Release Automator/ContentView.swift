@@ -339,73 +339,83 @@ struct ContentView: View {
     // MARK: - Subviews
     
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Configuration")
-                .font(.headline)
-                .padding(.bottom, 5)
-            
-            // Key Status Section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Private Key Status")
-                    .font(.caption).bold()
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Configuration")
+                    .font(.headline)
+                    .padding(.bottom, 5)
                 
-                HStack {
-                    Image(systemName: vm.isKeyInKeychain ? "lock.shield.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(vm.isKeyInKeychain ? .green : .orange)
-                    Text(vm.isKeyInKeychain ? "Found in Keychain" : "Missing from Keychain")
-                        .font(.system(size: 13, weight: .medium))
-                    Spacer()
-                }
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
-                
-                if vm.isKeyInKeychain {
-                    Button(action: { vm.showPublicKey() }) {
-                        Label("Show Public Key", systemImage: "eye")
+                // Key Status Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Private Key Status")
+                        .font(.caption).bold()
+                    
+                    HStack {
+                        Image(systemName: vm.isKeyInKeychain ? "lock.shield.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(vm.isKeyInKeychain ? .green : .orange)
+                        Text(vm.isKeyInKeychain ? "Found in Keychain" : "Missing from Keychain")
+                            .font(.system(size: 13, weight: .medium))
+                        Spacer()
+                    }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
+                    
+                    if vm.isKeyInKeychain {
+                        Button(action: { vm.showPublicKey() }) {
+                            Label("Show Public Key", systemImage: "eye")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .controlSize(.small)
+                    } else {
+                        Text("No key found. Run `generate_keys` in Terminal to create one.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    // Refresh Button
+                    Button(action: { vm.checkKeychainStatus() }) {
+                        Label("Refresh Status", systemImage: "arrow.clockwise")
                             .frame(maxWidth: .infinity)
                     }
                     .controlSize(.small)
-                } else {
-                    Text("No key found. Run `generate_keys` in Terminal to create one.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 5)
                 }
                 
-                // Refresh Button
-                Button(action: { vm.checkKeychainStatus() }) {
-                    Label("Refresh Status", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .controlSize(.small)
-                .padding(.top, 5)
-            }
-            
-            Spacer()
-            
-            // App Info Small Summary
-            if vm.isAppLoaded {
+                Spacer()
+                
+                // MARK: - About App Section
                 Divider()
-                Text("App Details")
-                    .font(.headline)
-                HStack(alignment: .top) {
-                    if let icon = vm.appIcon {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                    }
-                    VStack(alignment: .leading) {
-                        Text(vm.appName).font(.system(size: 16, weight: .bold))
-                        Text("v\(vm.appShortVersion) (\(vm.appVersion))")
-                            .font(.subheadline).foregroundColor(.secondary)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(nsImage: NSApplication.shared.applicationIconImage)
+                        .resizable()
+                        .frame(width: 42, height: 42)
+                    
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Sparkle Release Automator")
+                            .font(.system(size: 12, weight: .bold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+                        
+                        Text("v\(version)")
+                            .font(.caption)
+                            .foregroundColor(.secondary.opacity(0.9))
+                        
+                        Text("Copyright © 2025 Umut Erhan")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                            .padding(.top, 2)
+                        
+                        
+                        
                     }
                 }
+                .padding(.bottom, 5)
             }
+            .padding()
+            .frame(width: 260)
+            .background(Color(NSColor.controlBackgroundColor))
         }
-        .padding()
-        .frame(width: 260)
-        .background(Color(NSColor.controlBackgroundColor))
-    }
     
     var dropZoneArea: some View {
         ZStack {
@@ -431,7 +441,7 @@ struct ContentView: View {
                     
                     if vm.isKeyInKeychain {
                         Button(action: { vm.generateRelease() }) {
-                            Label("Generate Release", systemImage: "sparkles")
+                            Label("Generate Zip and Sign", systemImage: "sparkles")
                                 .font(.headline)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
