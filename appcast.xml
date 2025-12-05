@@ -1,1 +1,17 @@
-
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Sparkle Release Automator Updates</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Fri, 5 Dec 2025 23:07:51 +0100</pubDate>
+            <sparkle:version>0.1.0</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <enclosure 
+                url="https://github.com/uecoding/Sparkle-Release-Automator/releases/download/v0.1.0/Sparkle.Release.Automator-v0.1.0.zip" 
+                sparkle:edSignature="5JTqWImIrcfPnN8tXnwESX/wBTDmn3kZ0kgjywEDqRd14WGI1gH/f8vS3KtfJbuf82cUeKnmyXZQDAFTjnUdBQ==" 
+                length="4073797" 
+                type="application/octet-stream" />
+        </item>
+    </channel>
+</rss>
