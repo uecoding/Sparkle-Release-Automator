@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4C1042672EE38A4800280149 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 4C1042662EE38A4800280149 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		4C5990C22EE2431D0067ECA6 /* Sparkle Release Automator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Sparkle Release Automator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C1042672EE38A4800280149 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = "Sparkle Release Automator";
 			packageProductDependencies = (
+				4C1042662EE38A4800280149 /* Sparkle */,
 			);
 			productName = "Sparkle Release Automator";
 			productReference = 4C5990C22EE2431D0067ECA6 /* Sparkle Release Automator.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 4C5990B92EE2431D0067ECA6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4C1042652EE38A4800280149 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4C5990C32EE2431D0067ECA6 /* Products */;
 			projectDirPath = "";
@@ -258,6 +267,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sparkle-Release-Automator-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -289,6 +299,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sparkle-Release-Automator-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -329,6 +340,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4C1042652EE38A4800280149 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4C1042662EE38A4800280149 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4C1042652EE38A4800280149 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4C5990BA2EE2431D0067ECA6 /* Project object */;
 }
