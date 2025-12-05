@@ -1,3 +1,10 @@
+//
+//  ContentView.swift
+//  Sparkle Release Automator
+//
+//  Created by Umut on 04/12/2025.
+//
+
 import SwiftUI
 import Combine
 import UniformTypeIdentifiers
@@ -319,6 +326,7 @@ class ReleaseBuilderViewModel: ObservableObject {
 // MARK: - View
 struct ContentView: View {
     @StateObject var vm = ReleaseBuilderViewModel()
+    @State private var showLicenseSheet = false
     
     var body: some View {
         HStack(spacing: 0) {
@@ -344,6 +352,9 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 700)
         .sheet(isPresented: $vm.showPublicKeySheet) {
             PublicKeySheet(publicKey: vm.currentPublicKey)
+        }
+        .sheet(isPresented: $showLicenseSheet) {
+            LicenseSheet()
         }
     }
     
@@ -417,8 +428,12 @@ struct ContentView: View {
                             .foregroundColor(.secondary.opacity(0.7))
                             .padding(.top, 2)
                         
-                        
-                        
+                        Button("Sparkle & 3rd Party Licenses") {
+                            showLicenseSheet = true
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption2)
+                        .padding(.top, 1)
                     }
                 }
                 .padding(.bottom, 5)
@@ -557,8 +572,6 @@ struct ContentView: View {
                 .tint(.green.opacity(0.3))
                 .controlSize(.large)
             
-            // "Export XML" button removed as requested
-            
             if let zipUrl = vm.zipLocation {
                 Button(action: {
                     NSWorkspace.shared.activateFileViewerSelecting([zipUrl])
@@ -632,5 +645,36 @@ struct PublicKeySheet: View {
         }
         .padding(30)
         .frame(width: 500)
+    }
+}
+
+// MARK: - License Sheet
+struct LicenseSheet: View {
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        VStack(spacing: 15) {
+            Text("Sparkle & Third-Party Licenses")
+                .font(.title2).bold()
+                .padding(.top, 20)
+            
+            ScrollView {
+                // Now referencing the struct from the separate file
+                Text(SparkleLicenses.fullText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .padding()
+            }
+            .background(Color(NSColor.textBackgroundColor))
+            .cornerRadius(8)
+            .border(Color.gray.opacity(0.2), width: 1)
+            
+            Button("Close") {
+                presentationMode.wrappedValue.dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal, 20)
+        .frame(width: 600, height: 500)
     }
 }
